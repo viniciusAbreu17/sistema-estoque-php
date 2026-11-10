@@ -15,6 +15,7 @@ if (session_status() === PHP_SESSION_NONE) {
 <nav>
   <a href="/estoque/index.php">Início</a>
   <?php if (isset($_SESSION['usuario_id'])): ?>
+    <a href="/estoque/produtos/listar.php">Produtos</a>
     <span>Olá, <?= htmlspecialchars($_SESSION['usuario_nome']) ?></span>
     <a href="/estoque/auth/logout.php">Sair</a>
   <?php else: ?>
