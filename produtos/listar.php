@@ -1,18 +1,18 @@
 <?php
 require __DIR__ . '/../includes/auth.php';
 require __DIR__ . '/../config/conexao.php';
+require __DIR__ . '/../includes/funcoes.php';
 
-// 1. Lê os filtros que vieram pela URL (método GET)
+$porPagina = 10;
+
+// 1. Lê filtros e página atual da URL (GET)
 $busca     = trim($_GET['busca'] ?? '');
 $categoria = filter_var($_GET['categoria'] ?? '', FILTER_VALIDATE_INT);
+$pagina    = max(1, (int) filter_var($_GET['pagina'] ?? 1, FILTER_VALIDATE_INT));
 
 $categorias = $pdo->query('SELECT id, nome FROM categorias ORDER BY nome')->fetchAll();
 
-// 2. Monta a consulta com as condições que foram preenchidas
-$sql = 'SELECT p.id, p.nome, p.preco, p.quantidade, c.nome AS categoria
-        FROM produtos p
-        LEFT JOIN categorias c ON c.id = p.categoria_id';
-
+// 2. Monta as condições do WHERE
 $condicoes = [];
 $params    = [];
 
@@ -26,13 +26,25 @@ if ($categoria) {
     $params[]    = $categoria;
 }
 
-if ($condicoes) {
-    $sql .= ' WHERE ' . implode(' AND ', $condicoes);
-}
+$where = $condicoes ? ' WHERE ' . implode(' AND ', $condicoes) : '';
 
-$sql .= ' ORDER BY p.nome';
+// 3. Conta o total de produtos que batem com os filtros
+$stmtTotal = $pdo->prepare('SELECT COUNT(*) FROM produtos p' . $where);
+$stmtTotal->execute($params);
+$total = (int) $stmtTotal->fetchColumn();
 
-// 3. Executa com prepared statement
+$totalPaginas = max(1, (int) ceil($total / $porPagina));
+$pagina       = min($pagina, $totalPaginas);
+$offset       = ($pagina - 1) * $porPagina;
+
+// 4. Busca só os produtos da página atual
+$sql = 'SELECT p.id, p.nome, p.preco, p.quantidade, c.nome AS categoria
+        FROM produtos p
+        LEFT JOIN categorias c ON c.id = p.categoria_id'
+     . $where
+     . ' ORDER BY p.nome'
+     . ' LIMIT ' . $porPagina . ' OFFSET ' . $offset;
+
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $produtos = $stmt->fetchAll();
@@ -75,7 +87,7 @@ require __DIR__ . '/../includes/header.php';
   <?php endif; ?>
 </form>
 
-<p><a href="criar.php">+ Novo produto</a></p>
+<p><a href="criar.php" class="btn-novo">+ Novo produto</a></p>
 
 <?php if (!$produtos): ?>
   <p>
@@ -84,33 +96,61 @@ require __DIR__ . '/../includes/header.php';
         : 'Nenhum produto cadastrado ainda.' ?>
   </p>
 <?php else: ?>
-  <p><?= count($produtos) ?> produto(s) encontrado(s).</p>
+  <p class="resumo">
+    <?= $total ?> produto(s) encontrado(s) — página <?= $pagina ?> de <?= $totalPaginas ?>
+  </p>
 
-  <table border="1" cellpadding="6">
-    <tr>
-      <th>Nome</th>
-      <th>Categoria</th>
-      <th>Preço</th>
-      <th>Qtd.</th>
-      <th>Ações</th>
-    </tr>
-    <?php foreach ($produtos as $p): ?>
+  <div class="tabela-wrap">
+    <table class="tabela">
       <tr>
-        <td><?= htmlspecialchars($p['nome']) ?></td>
-        <td><?= htmlspecialchars($p['categoria'] ?? '—') ?></td>
-        <td>R$ <?= number_format($p['preco'], 2, ',', '.') ?></td>
-        <td><?= (int) $p['quantidade'] ?></td>
-        <td>
-          <a href="editar.php?id=<?= (int) $p['id'] ?>">Editar</a>
-          <form method="POST" action="excluir.php" style="display:inline"
-                onsubmit="return confirm('Excluir este produto?');">
-            <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
-            <button type="submit">Excluir</button>
-          </form>
-        </td>
+        <th>Nome</th>
+        <th>Categoria</th>
+        <th>Preço</th>
+        <th>Qtd.</th>
+        <th>Ações</th>
       </tr>
-    <?php endforeach; ?>
-  </table>
+      <?php foreach ($produtos as $p): ?>
+        <tr>
+          <td><?= htmlspecialchars($p['nome']) ?></td>
+          <td><?= htmlspecialchars($p['categoria'] ?? '—') ?></td>
+          <td>R$ <?= number_format($p['preco'], 2, ',', '.') ?></td>
+          <td class="<?= $p['quantidade'] <= 5 ? 'baixo' : '' ?>">
+            <?= (int) $p['quantidade'] ?>
+          </td>
+          <td>
+            <div class="acoes">
+              <a href="editar.php?id=<?= (int) $p['id'] ?>">Editar</a>
+              <form method="POST" action="excluir.php"
+                    onsubmit="return confirm('Excluir este produto?');">
+                <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                <button type="submit" class="btn-perigo">Excluir</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </table>
+  </div>
+
+  <?php if ($totalPaginas > 1): ?>
+    <div class="paginacao">
+      <?php if ($pagina > 1): ?>
+        <a href="<?= htmlspecialchars(urlPagina($pagina - 1, $busca, $categoria)) ?>">« Anterior</a>
+      <?php endif; ?>
+
+      <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
+        <?php if ($i === $pagina): ?>
+          <span class="atual"><?= $i ?></span>
+        <?php else: ?>
+          <a href="<?= htmlspecialchars(urlPagina($i, $busca, $categoria)) ?>"><?= $i ?></a>
+        <?php endif; ?>
+      <?php endfor; ?>
+
+      <?php if ($pagina < $totalPaginas): ?>
+        <a href="<?= htmlspecialchars(urlPagina($pagina + 1, $busca, $categoria)) ?>">Próxima »</a>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
 <?php endif; ?>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

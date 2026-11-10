@@ -21,3 +21,16 @@ function validarProduto(array $post): array
 
     return [$produto, $erro];
 }
+function urlPagina(int $pagina, string $busca, $categoria): string
+{
+    $query = ['pagina' => $pagina];
+
+    if ($busca !== '') {
+        $query['busca'] = $busca;
+    }
+    if ($categoria) {
+        $query['categoria'] = $categoria;
+    }
+
+    return 'listar.php?' . http_build_query($query);
+}
