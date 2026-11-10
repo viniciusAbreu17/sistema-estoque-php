@@ -233,3 +233,32 @@ button:hover,
   background: var(--cor-primaria);
   border-color: var(--cor-primaria);
 }
+/* Painel */
+h2 {
+  margin-top: 2rem;
+  font-size: 1.2rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+}
+
+.card-valor {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.card-rotulo {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
